@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameToZone - Play & Earn</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
+
+    <!-- REAL ADS SCRIPT -->
+    <script src="https://ad.gigapub.tech/script?id=4398"></script>
+
+    <style>
+        body { font-family: 'Poppins', sans-serif; background-color: #0f172a; color: #fff; user-select: none; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 5px; }
+        .pulse-gold-btn { animation: pulse-gold 2s infinite; }
+        @keyframes pulse-gold { 0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(234, 179, 8, 0); } 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); } }
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; background: #1e293b; border-left: 4px solid #6366f1; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; align-items: center; opacity: 0; transition: opacity 0.3s; }
+        .toast.show { opacity: 1; }
+        .nav-item.active { color: #6366f1; }
+        .game-frame { width: 100%; height: 100%; border: none; }
+        .disabled-card { opacity: 0.5; pointer-events: none; filter: grayscale(1); }
+    </style>
+</head>
+<body class="h-screen flex flex-col relative">
+    <div id="toast-container"></div>
+
+    <!-- Auth -->
+    <div id="auth-screen" class="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-6">
+        <div class="w-24 h-24 bg-indigo-600 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/50">
+            <i class="fas fa-gamepad text-4xl text-white"></i>
+        </div>
+        <h1 class="text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">GameToZone</h1>
+        <p class="text-slate-400 mb-6 text-center">Play, Watch & Earn Real Cash!</p>
+        <div class="w-full max-w-xs bg-slate-800/60 rounded-2xl p-4 border border-slate-700">
+            <div class="flex bg-slate-900/60 rounded-lg p-1 text-xs font-semibold mb-4">
+                <button id="login-tab" type="button" onclick="setAuthMode('login')" class="flex-1 py-2 rounded-md bg-slate-900 text-white">Login</button>
+                <button id="signup-tab" type="button" onclick="setAuthMode('signup')" class="flex-1 py-2 rounded-md text-slate-400">Sign Up</button>
+            </div>
+            <form id="auth-form" class="space-y-3" onsubmit="submitAuth(event)">
+                <input id="auth-email" type="email" required placeholder="Email" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white outline-none">
+                <input id="auth-password" type="password" required minlength="6" placeholder="Password" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white outline-none">
+                <div id="signup-extra" class="space-y-3 hidden">
+                    <input id="auth-confirm-password" type="password" minlength="6" placeholder="Confirm Password" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white outline-none">
+                </div>
+                <button id="auth-submit-btn" type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl font-bold text-sm shadow-lg">Login & Start</button>
+            </form>
+            <p id="auth-error" class="text-xs text-red-400 mt-3 hidden"></p>
+            <p class="text-[10px] text-slate-500 mt-3 text-center">By continuing you agree to our basic terms of use.</p>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div id="main-app" class="hidden flex-1 flex flex-col overflow-hidden pb-16">
+        <header class="flex justify-between items-center p-4 bg-slate-800/80 backdrop-blur sticky top-0 z-20 border-b border-slate-700">
+            <div class="flex items-center">
+                <div class="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center mr-2 shadow-lg">
+                    <i class="fas fa-coins text-white text-xs"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] text-slate-400 uppercase">Balance</p>
+                    <p class="font-bold text-white leading-none" id="header-balance">0</p>
+                </div>
+            </div>
+            <div class="font-bold text-indigo-400">GameToZone</div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-4 relative">
+            <div id="home-page" class="page-section">
+                <!-- Socials -->
+                <div id="social-links-container" class="flex justify-center gap-4 mb-6 hidden"></div>
+
+                <!-- Watch & Earn -->
+                <div id="watch-earn-card" onclick="triggerWatchEarn()" class="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-6 mb-6 relative overflow-hidden shadow-lg active:scale-95 transition cursor-pointer">
+                    <div class="relative z-10">
+                        <h2 class="text-2xl font-bold text-white mb-1"><i class="fas fa-play-circle mr-2"></i>Watch & Earn</h2>
+                        <p class="text-blue-100 text-sm">Watch ads to get coins!</p>
+                        <div class="mt-4 inline-block bg-white/20 px-4 py-1 rounded-full text-xs font-bold backdrop-blur-sm">
+                            GET <span id="ad-reward-disp">50</span> COINS
+                        </div>
+                        <p id="ad-timer-msg" class="text-xs text-yellow-300 mt-2 hidden">Next ad in: <span id="ad-cooldown-timer">0</span>s</p>
+                    </div>
+                    <i class="fas fa-video absolute -bottom-4 -right-4 text-8xl text-white opacity-10"></i>
+                </div>
+
+                <!-- Play Games -->
+                <div onclick="showPage('games-list-page')" class="bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl p-6 mb-6 relative overflow-hidden shadow-lg active:scale-95 transition cursor-pointer">
+                    <div class="relative z-10">
+                        <h2 class="text-2xl font-bold text-white mb-1"><i class="fas fa-gamepad mr-2"></i>Play Games</h2>
+                        <p class="text-orange-100 text-sm">Play <span id="game-time-disp">60</span>s to earn.</p>
+                        <div class="mt-4 inline-block bg-white/20 px-4 py-1 rounded-full text-xs font-bold backdrop-blur-sm">PLAY NOW</div>
+                    </div>
+                    <i class="fas fa-ghost absolute -bottom-4 -right-4 text-8xl text-white opacity-10"></i>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <p class="text-slate-400 text-xs">Total Earned</p>
+                        <p class="text-xl font-bold text-green-400" id="total-earned-display">0</p>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <p class="text-slate-400 text-xs">Refers</p>
+                        <p class="text-xl font-bold text-blue-400" id="total-refers-display">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="games-list-page" class="page-section hidden">
+                <button onclick="showPage('home-page')" class="mb-4 text-slate-400 text-sm flex items-center"><i class="fas fa-arrow-left mr-2"></i> Back</button>
+                <div id="games-list" class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2 text-center py-10 text-slate-500">Loading Games...</div>
+                </div>
+            </div>
+
+            <div id="wallet-page" class="page-section hidden">
+                <div class="bg-slate-800 rounded-2xl p-6 mb-6 text-center border border-slate-700">
+                    <p class="text-slate-400 text-sm mb-1">Current Balance</p>
+                    <h1 class="text-4xl font-bold text-yellow-400 mb-2" id="wallet-balance">0</h1>
+                    <p class="text-xs text-green-400 font-bold bg-green-400/10 inline-block px-3 py-1 rounded-full">Rate: 100 Coins = <span id="val-disp">₹1</span></p>
+                </div>
+                <div class="bg-slate-800 rounded-xl p-4">
+                    <h3 class="font-bold mb-4 text-indigo-400">Withdraw Money</h3>
+                    <form onsubmit="handleWithdraw(event)" class="space-y-3">
+                        <select id="withdraw-method" class="w-full bg-slate-700 border-none rounded-lg p-3 text-white"></select>
+                        <input type="text" id="withdraw-details" required placeholder="Enter Mobile / UPI ID" class="w-full bg-slate-700 border-none rounded-lg p-3 text-white">
+                        <input type="number" id="withdraw-amount" required min="100" placeholder="Amount (Coins)" class="w-full bg-slate-700 border-none rounded-lg p-3 text-white">
+                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg">Submit Request</button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="history-page" class="page-section hidden">
+                <h3 class="font-bold mb-4 text-white">Transaction History</h3>
+                <div id="tx-history" class="space-y-2"><p class="text-center text-slate-500 text-sm py-10">No transactions.</p></div>
+            </div>
+
+            <div id="refer-page" class="page-section hidden">
+                <div class="text-center mt-10">
+                    <i class="fas fa-users text-6xl text-indigo-500 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-white mb-2">Invite Friends</h2>
+                    <p class="text-slate-400 mb-6 px-4">Earn <span class="text-yellow-400" id="refer-bonus-disp">500</span> Coins per refer.</p>
+                    <div class="bg-slate-800 p-4 rounded-xl mx-4 border border-dashed border-slate-600 mb-6">
+                        <p class="text-xs text-slate-400 mb-2">YOUR CODE</p>
+                        <div class="flex justify-between items-center bg-slate-900 rounded-lg p-3">
+                            <span id="my-ref-code" class="font-mono text-lg font-bold text-white tracking-wider">...</span>
+                            <button onclick="copyRefCode()" class="text-indigo-400 hover:text-white"><i class="fas fa-copy"></i></button>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl mx-4 border border-slate-700">
+                        <p class="text-xs text-slate-400 mb-2 text-left">HAVE A CODE?</p>
+                        <div class="flex gap-2">
+                            <input type="text" id="input-ref-code" placeholder="Enter Code" class="bg-slate-900 flex-1 rounded-lg p-3 text-white border border-slate-600 outline-none uppercase">
+                            <button onclick="redeemReferral()" class="bg-green-600 text-white px-4 rounded-lg font-bold">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <nav class="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 flex justify-around p-2 pb-6 z-30">
+            <button onclick="showPage('home-page')" class="nav-item active flex flex-col items-center text-slate-500 w-1/4" id="nav-home"><i class="fas fa-home text-xl mb-1"></i> <span class="text-[10px]">Home</span></button>
+            <button onclick="showPage('refer-page')" class="nav-item flex flex-col items-center text-slate-500 w-1/4" id="nav-refer"><i class="fas fa-share-alt text-xl mb-1"></i> <span class="text-[10px]">Refer</span></button>
+            <button onclick="showPage('wallet-page')" class="nav-item flex flex-col items-center text-slate-500 w-1/4" id="nav-wallet"><i class="fas fa-wallet text-xl mb-1"></i> <span class="text-[10px]">Wallet</span></button>
+            <button onclick="showPage('history-page')" class="nav-item flex flex-col items-center text-slate-500 w-1/4" id="nav-history"><i class="fas fa-history text-xl mb-1"></i> <span class="text-[10px]">History</span></button>
+        </nav>
+    </div>
+
+    <!-- Overlay -->
+    <div id="play-overlay" class="hidden fixed inset-0 z-50 bg-slate-900 flex flex-col">
+        <div class="flex justify-between items-center p-3 bg-slate-800 z-10 shadow-lg">
+            <button onclick="exitGame()" class="text-white bg-red-600 px-3 py-1 rounded text-xs font-bold">EXIT</button>
+            <div class="flex items-center gap-2">
+                <i class="fas fa-clock text-slate-400 text-xs"></i>
+                <div class="bg-black px-3 py-1 rounded text-yellow-400 font-mono font-bold" id="game-timer">00:00</div>
+            </div>
+        </div>
+        <div id="top-claim-container" class="hidden absolute top-16 left-0 right-0 z-20 flex justify-center px-4">
+            <button onclick="triggerClaimReward()" class="bg-gradient-to-r from-yellow-500 to-orange-600 text-white font-bold text-lg py-3 px-8 rounded-full shadow-lg border-2 border-yellow-300 pulse-gold-btn flex items-center gap-2"><i class="fas fa-gift"></i> CLAIM COIN</button>
+        </div>
+        <div class="flex-1 bg-black relative w-full h-full">
+            <iframe id="game-iframe" src="" class="game-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+    </div>
+
+    <!-- Simulation (Fallback) -->
+    <div id="ad-modal" class="hidden fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4">
+        <div class="absolute top-4 right-4 text-xs font-bold bg-white text-black px-2 py-1 rounded" id="ad-timer">5s</div>
+        <div class="w-full max-w-sm bg-slate-800 p-6 rounded-lg text-center border border-indigo-500">
+            <h2 class="text-xl font-bold text-white mb-2">Ad Loading...</h2>
+            <div class="h-40 bg-slate-700 rounded mb-4 flex items-center justify-center animate-pulse"><i class="fas fa-ad text-4xl text-slate-500"></i></div>
+            <p class="text-xs text-slate-400 mb-4">Please wait...</p>
+        </div>
+    </div>
+
+    <script>
+        let authMode = 'login';
+
+        function setAuthMode(mode) {
+            authMode = mode;
+            const loginTab = document.getElementById('login-tab');
+            const signupTab = document.getElementById('signup-tab');
+            const signupExtra = document.getElementById('signup-extra');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const errorEl = document.getElementById('auth-error');
+
+            if (!loginTab || !signupTab) return;
+
+            if (mode === 'login') {
+                loginTab.classList.add('bg-slate-900', 'text-white');
+                loginTab.classList.remove('text-slate-400');
+                signupTab.classList.remove('bg-slate-900', 'text-white');
+                signupTab.classList.add('text-slate-400');
+                if (signupExtra) signupExtra.classList.add('hidden');
+                if (submitBtn) submitBtn.textContent = 'Login & Start';
+            } else {
+                signupTab.classList.add('bg-slate-900', 'text-white');
+                signupTab.classList.remove('text-slate-400');
+                loginTab.classList.remove('bg-slate-900', 'text-white');
+                loginTab.classList.add('text-slate-400');
+                if (signupExtra) signupExtra.classList.remove('hidden');
+                if (submitBtn) submitBtn.textContent = 'Sign Up & Start';
+            }
+
+            if (errorEl) {
+                errorEl.classList.add('hidden');
+                errorEl.textContent = '';
+            }
+        }
+
+        function submitAuth(event) {
+            event.preventDefault();
+            const emailInput = document.getElementById('auth-email');
+            const passwordInput = document.getElementById('auth-password');
+            const confirmInput = document.getElementById('auth-confirm-password');
+            const errorEl = document.getElementById('auth-error');
+
+            if (!emailInput || !passwordInput) return;
+
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+            const confirm = confirmInput ? confirmInput.value : '';
+
+            if (!email || !password) {
+                if (errorEl) {
+                    errorEl.textContent = 'Please fill all required fields.';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+
+            if (authMode === 'signup' && password !== confirm) {
+                if (errorEl) {
+                    errorEl.textContent = 'Passwords do not match.';
+                    errorEl.classList.remove('hidden');
+                }
+                return;
+            }
+
+            const authScreen = document.getElementById('auth-screen');
+            const mainApp = document.getElementById('main-app');
+
+            if (authScreen && mainApp) {
+                authScreen.classList.add('hidden');
+                mainApp.classList.remove('hidden');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            setAuthMode('login');
+        });
+    </script>
+</body>
+</html>
